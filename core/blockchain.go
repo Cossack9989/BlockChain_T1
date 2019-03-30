@@ -1,47 +1,64 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"time"
-
-	"github.com/deckarep/golang-set"
+	"github.com/boltdb/bolt"
 )
 
-type Block struct {
-	Index        int           `json:"index"`
-	Timestamp    string        `json:"timestamp"`
-	Transactions []Transaction `json:"transactions"`
-	Proof        int           `json:"proof"`
-	PreviousHash string        `json:"previous_hash"`
-}
-type Transaction struct {
-	Amount    int    `json:"amount"`
-	Recipient string `json:"recipient"`
-	Sender    string `json:"sender"`
-}
-type Chain struct {
-	Chain  []Block `json:"chain"`
-	Length int     `json:"length"`
-}
-type Blockchain struct {
-	CurrentTransactions []Transaction
-	Chain               []Block
-	Nodes               mapset.Set
+const dbFile = "Blocks.db"
+const blocksBucket = "Blocks"
+
+type BlockChain struct {
+	tip []byte
+	db  *bolt.DB
 }
 
-func (t *Blockchain) Genesis() *Blockchain {
-	//balabala
-	return t
+func NewBlockChain() *BlockChain {
+	var tip []byte
+	db, _ := bolt.Open(dbFile, 0600, nil)
+
+	db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(blocksBucket))
+
+		if b == nil {
+			genesis := NewGenesisBlock()
+			b, _ := tx.CreateBucket([]byte(blocksBucket))
+			hash := genesis.GetBlockHash()
+			b.Put(hash, genesis.Serialize())
+			b.Put([]byte("l"), hash)
+
+			tip = hash
+		} else {
+			tip = b.Get([]byte("l"))
+		}
+		return nil
+	})
+	bc := &BlockChain{tip, db}
+	return bc
 }
-func (t *Blockchain) NewBlock(proof int, previousHash string) Block {
-	block := new(Block)
-	//balabala
-	return *block
-}
-func (t *Blockchain) NewTransaction(sender string, recipient string, amount int) int {
-	transaction := new(Transaction)
-	//balabala
-	return 0
+
+func (bc *BlockChain) AddBlock(data string) {
+	var lastHash []byte
+
+	bc.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(blocksBucket))
+		lastHash = b.Get([]byte("l"))
+		return nil
+	})
+
+	newBlock := NewBlock(data, lastHash)
+	bc.db.Update(func(tx *bolt.Tx) error {
+		hash := newBlock.GetBlockHash()
+		b := tx.Bucket([]byte(blocksBucket))
+		b.Put(hash, newBlock.Serialize())
+		b.Put([]byte("l"), hash)
+		if 1 == 1 {
+			fmt.Printf("Prev's hash: %x\n", newBlock.PrevBlockHash)
+			fmt.Printf("    Data   : %s\n", newBlock.Data)
+			fmt.Printf("    Proof  : %d\n", newBlock.Proof)
+			fmt.Println()
+		}
+		return nil
+	})
+
 }

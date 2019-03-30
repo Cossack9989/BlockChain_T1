@@ -1,0 +1,4 @@
+*.db
+*.db.lock
+test.go
+tmp.go

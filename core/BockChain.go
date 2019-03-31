@@ -14,7 +14,7 @@ type BlockChain struct {
 	db  *bolt.DB
 }
 
-func NewBlockChain() *BlockChain {
+func NewBlockChain(address string) *BlockChain {
 	var tip []byte
 	db, _ := bolt.Open(dbFile, 0600, nil)
 
@@ -22,7 +22,8 @@ func NewBlockChain() *BlockChain {
 		b := tx.Bucket([]byte(blocksBucket))
 
 		if b == nil {
-			genesis := NewGenesisBlock()
+			cb := NewCoinbaseTX(address, "The Beginer!")
+			genesis := NewGenesisBlock(cb)
 			b, _ := tx.CreateBucket([]byte(blocksBucket))
 			hash := genesis.GetBlockHash()
 			b.Put(hash, genesis.Serialize())
@@ -38,7 +39,7 @@ func NewBlockChain() *BlockChain {
 	return bc
 }
 
-func (bc *BlockChain) AddBlock(data string) {
+func (bc *BlockChain) AddBlock(txs []*Transaction) {
 	lastHash := bc.tip
 
 	// bc.db.View(func(tx *bolt.Tx) error {
@@ -47,7 +48,7 @@ func (bc *BlockChain) AddBlock(data string) {
 	// 	return nil
 	// })
 
-	newBlock := NewBlock(data, lastHash)
+	newBlock := NewBlock(txs, lastHash)
 	bc.db.Update(func(tx *bolt.Tx) error {
 		hash := newBlock.GetBlockHash()
 		b := tx.Bucket([]byte(blocksBucket))
@@ -55,7 +56,7 @@ func (bc *BlockChain) AddBlock(data string) {
 		b.Put([]byte("l"), hash)
 		if dbg == 1 {
 			fmt.Printf("Prev's hash: %x\n", newBlock.PrevBlockHash)
-			fmt.Printf("    Data   : %s\n", newBlock.Data)
+			// fmt.Printf("    Data   : %s\n", newBlock.Data)
 			fmt.Printf("    Proof  : %d\n", newBlock.Proof)
 			fmt.Println()
 		}

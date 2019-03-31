@@ -7,6 +7,7 @@ import (
 
 const dbFile = "Blocks.db"
 const blocksBucket = "Blocks"
+const dbg = 1
 
 type BlockChain struct {
 	tip []byte
@@ -38,13 +39,13 @@ func NewBlockChain() *BlockChain {
 }
 
 func (bc *BlockChain) AddBlock(data string) {
-	var lastHash []byte
+	lastHash := bc.tip
 
-	bc.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(blocksBucket))
-		lastHash = b.Get([]byte("l"))
-		return nil
-	})
+	// bc.db.View(func(tx *bolt.Tx) error {
+	// 	b := tx.Bucket([]byte(blocksBucket))
+	// 	lastHash = b.Get([]byte("l"))
+	// 	return nil
+	// })
 
 	newBlock := NewBlock(data, lastHash)
 	bc.db.Update(func(tx *bolt.Tx) error {
@@ -52,7 +53,7 @@ func (bc *BlockChain) AddBlock(data string) {
 		b := tx.Bucket([]byte(blocksBucket))
 		b.Put(hash, newBlock.Serialize())
 		b.Put([]byte("l"), hash)
-		if 1 == 1 {
+		if dbg == 1 {
 			fmt.Printf("Prev's hash: %x\n", newBlock.PrevBlockHash)
 			fmt.Printf("    Data   : %s\n", newBlock.Data)
 			fmt.Printf("    Proof  : %d\n", newBlock.Proof)

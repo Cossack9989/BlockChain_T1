@@ -2,3 +2,5 @@
 *.db.lock
 test.go
 tmp.go
+/.vscode
+/.idea

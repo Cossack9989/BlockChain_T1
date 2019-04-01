@@ -41,13 +41,6 @@ func NewBlockChain(address string) *BlockChain {
 
 func (bc *BlockChain) AddBlock(txs []*Transaction) {
 	lastHash := bc.tip
-
-	// bc.db.View(func(tx *bolt.Tx) error {
-	// 	b := tx.Bucket([]byte(blocksBucket))
-	// 	lastHash = b.Get([]byte("l"))
-	// 	return nil
-	// })
-
 	newBlock := NewBlock(txs, lastHash)
 	bc.db.Update(func(tx *bolt.Tx) error {
 		hash := newBlock.GetBlockHash()
@@ -56,11 +49,47 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) {
 		b.Put([]byte("l"), hash)
 		if dbg == 1 {
 			fmt.Printf("Prev's hash: %x\n", newBlock.PrevBlockHash)
-			// fmt.Printf("    Data   : %s\n", newBlock.Data)
 			fmt.Printf("    Proof  : %d\n", newBlock.Proof)
 			fmt.Println()
 		}
 		return nil
 	})
+}
 
+func (bc *BlockChain) FindUnspentTransactions(address string) []*Transaction {
+	var unspentTXs []*Transaction
+	spentTXOs := make(map[string][]int)
+	bci := bc.GetIterator()
+	for {
+		block := bci.Next()
+
+		for _, tx := range block.Transactions {
+			txid := string(tx.ID)
+		OutPuts:
+			for outIdx, out := range tx.Vout {
+				if spentTXOs[txid] != nil {
+					for _, spentOut := range spentTXOs[txid] {
+						if spentOut == outIdx {
+							continue OutPuts
+						}
+					}
+				}
+				if out.CanBeUnlockedWith(address) {
+					unspentTXs = append(unspentTXs, tx)
+				}
+			}
+			if tx.IsCoinBase() == false {
+				for _, in := range tx.Vin {
+					if in.CanUnlockOutputWith(address) {
+						inTxId := string(in.Txid)
+						spentTXOs[inTxId] = append(spentTXOs[inTxId], in.Vout)
+					}
+				}
+			}
+		}
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
+	}
+	return unspentTXs
 }

@@ -42,3 +42,6 @@ func DeserializeTransaction(data []byte) *Transaction {
 	json.Unmarshal(data, tx)
 	return tx
 }
+func (tx *Transaction) IsCoinBase() bool {
+	return len(tx.Vin) == 1 && len(tx.Vin[0].Txid) == 0 && tx.Vin[0].Vout == -1
+}

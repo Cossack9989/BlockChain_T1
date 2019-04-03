@@ -93,3 +93,36 @@ func (bc *BlockChain) FindUnspentTransactions(address string) []*Transaction {
 	}
 	return unspentTXs
 }
+
+func (bc *BlockChain) FindUnspentTransactionsOuts(address string) []TXOutput {
+	var unspentTXsOuts []TXOutput
+	unspentTXs := bc.FindUnspentTransactions(address)
+	for _, txs := range unspentTXs {
+		for _, out := range txs.Vout {
+			if out.CanBeUnlockedWith(address) {
+				unspentTXsOuts = append(unspentTXsOuts, out)
+			}
+		}
+	}
+	return unspentTXsOuts
+}
+
+func (bc *BlockChain) FindSpendableOutputs(from string, amount int) (int, map[string][]int) {
+	unspentTXs := bc.FindUnspentTransactions(from)
+	unspentTXOuts := make(map[string][]int)
+	accumulated := 0
+find:
+	for _, txs := range unspentTXs {
+		idtx := string(txs.ID)
+		for ido, out := range txs.Vout {
+			if out.CanBeUnlockedWith(from) {
+				accumulated += out.Value
+				unspentTXOuts[idtx] = append(unspentTXOuts[idtx], ido)
+				if accumulated >= amount {
+					break find
+				}
+			}
+		}
+	}
+	return accumulated, unspentTXOuts
+}

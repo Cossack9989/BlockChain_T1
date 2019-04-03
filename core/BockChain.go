@@ -7,7 +7,7 @@ import (
 
 const dbFile = "Blocks.db"
 const blocksBucket = "Blocks"
-const dbg = 1
+const dbgg = 0
 
 type BlockChain struct {
 	tip []byte
@@ -47,7 +47,8 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) {
 		b := tx.Bucket([]byte(blocksBucket))
 		b.Put(hash, newBlock.Serialize())
 		b.Put([]byte("l"), hash)
-		if dbg == 1 {
+		bc.tip = hash
+		if dbgg == 1 {
 			fmt.Printf("Prev's hash: %x\n", newBlock.PrevBlockHash)
 			fmt.Printf("    Proof  : %d\n", newBlock.Proof)
 			fmt.Println()

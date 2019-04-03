@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const targetBits = 24
+const targetBits = 4
 const maxnonce = math.MaxInt64
 
 type Block struct {

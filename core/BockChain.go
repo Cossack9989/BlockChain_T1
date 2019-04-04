@@ -5,24 +5,25 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-const dbFile = "Blocks.db"
+const BlocksFile = "Blocks.db"
 const blocksBucket = "Blocks"
 const dbgg = 0
 
 type BlockChain struct {
-	tip []byte
-	db  *bolt.DB
+	tip     []byte
+	db      *bolt.DB
+	Wallets *Wallets
 }
 
-func NewBlockChain(address string) *BlockChain {
+func NewBlockChain(pubKeyHash string) *BlockChain {
 	var tip []byte
-	db, _ := bolt.Open(dbFile, 0600, nil)
+	db, _ := bolt.Open(BlocksFile, 0600, nil)
 
 	db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 
 		if b == nil {
-			cb := NewCoinbaseTX(address, "The Beginer!")
+			cb := NewCoinbaseTX(pubKeyHash, "The Beginer!")
 			genesis := NewGenesisBlock(cb)
 			b, _ := tx.CreateBucket([]byte(blocksBucket))
 			hash := genesis.GetBlockHash()
@@ -35,7 +36,8 @@ func NewBlockChain(address string) *BlockChain {
 		}
 		return nil
 	})
-	bc := &BlockChain{tip, db}
+	ws := NewWallets()
+	bc := &BlockChain{tip, db, ws}
 	return bc
 }
 
@@ -57,7 +59,7 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) {
 	})
 }
 
-func (bc *BlockChain) FindUnspentTransactions(address string) []*Transaction {
+func (bc *BlockChain) FindUnspentTransactions(pubKeyHash []byte) []*Transaction {
 	var unspentTXs []*Transaction
 	spentTXOs := make(map[string][]int)
 	bci := bc.GetIterator()
@@ -75,13 +77,13 @@ func (bc *BlockChain) FindUnspentTransactions(address string) []*Transaction {
 						}
 					}
 				}
-				if out.CanBeUnlockedWith(address) {
+				if out.IsLockedWithKey(pubKeyHash) {
 					unspentTXs = append(unspentTXs, tx)
 				}
 			}
 			if tx.IsCoinBase() == false {
 				for _, in := range tx.Vin {
-					if in.CanUnlockOutputWith(address) {
+					if in.UseKey(pubKeyHash) {
 						inTxId := string(in.Txid)
 						spentTXOs[inTxId] = append(spentTXOs[inTxId], in.Vout)
 					}
@@ -95,12 +97,12 @@ func (bc *BlockChain) FindUnspentTransactions(address string) []*Transaction {
 	return unspentTXs
 }
 
-func (bc *BlockChain) FindUnspentTransactionsOuts(address string) []TXOutput {
+func (bc *BlockChain) FindUnspentTransactionsOuts(pubKeyHash []byte) []TXOutput {
 	var unspentTXsOuts []TXOutput
-	unspentTXs := bc.FindUnspentTransactions(address)
+	unspentTXs := bc.FindUnspentTransactions(pubKeyHash)
 	for _, txs := range unspentTXs {
 		for _, out := range txs.Vout {
-			if out.CanBeUnlockedWith(address) {
+			if out.IsLockedWithKey(pubKeyHash) {
 				unspentTXsOuts = append(unspentTXsOuts, out)
 			}
 		}
@@ -109,14 +111,16 @@ func (bc *BlockChain) FindUnspentTransactionsOuts(address string) []TXOutput {
 }
 
 func (bc *BlockChain) FindSpendableOutputs(from string, amount int) (int, map[string][]int) {
-	unspentTXs := bc.FindUnspentTransactions(from)
+	pubkeyhash := Base58Decode([]byte(from))
+	pubkeyhash = pubkeyhash[1 : len(pubkeyhash)-4]
+	unspentTXs := bc.FindUnspentTransactions(pubkeyhash)
 	unspentTXOuts := make(map[string][]int)
 	accumulated := 0
 find:
 	for _, txs := range unspentTXs {
 		idtx := string(txs.ID)
 		for ido, out := range txs.Vout {
-			if out.CanBeUnlockedWith(from) {
+			if out.IsLockedWithKey(pubkeyhash) {
 				accumulated += out.Value
 				unspentTXOuts[idtx] = append(unspentTXOuts[idtx], ido)
 				if accumulated >= amount {

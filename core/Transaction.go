@@ -18,8 +18,8 @@ func NewCoinbaseTX(to string, data string) *Transaction {
 	if data == "" {
 		data = fmt.Sprintf("Reward to '%s'", to)
 	}
-	txin := TXInput{[]byte{}, -1, data}
-	txout := TXOutput{subsidy, to}
+	txin := TXInput{[]byte{}, -1, nil, []byte(data)}
+	txout := NewTXOutput(subsidy, to)
 	tx := &Transaction{nil, []TXInput{txin}, []TXOutput{txout}}
 	tx.ID = tx.GetHash()
 	return tx
@@ -48,6 +48,8 @@ func (tx *Transaction) IsCoinBase() bool {
 
 func (bc *BlockChain) NewTransaction(from string, to string, amount int) *Transaction {
 	acc, validOutputs := bc.FindSpendableOutputs(from, amount)
+	ws := bc.Wallets
+	w := ws.GetWallet(from)
 	var inputs []TXInput
 	var outputs []TXOutput
 	if acc < amount {
@@ -56,12 +58,12 @@ func (bc *BlockChain) NewTransaction(from string, to string, amount int) *Transa
 	for id, outs := range validOutputs {
 		txid := []byte(id)
 		for _, out := range outs {
-			inputs = append(inputs, TXInput{txid, out, from})
+			inputs = append(inputs, TXInput{txid, out, nil, w.PublicKey})
 		}
 	}
-	outputs = append(outputs, TXOutput{amount, to})
+	outputs = append(outputs, NewTXOutput(amount, to))
 	if acc > amount {
-		outputs = append(outputs, TXOutput{acc - amount, from})
+		outputs = append(outputs, NewTXOutput(acc-amount, from))
 	}
 	tx := &Transaction{nil, inputs, outputs}
 	tx.ID = tx.GetHash()

@@ -5,14 +5,15 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/json"
 	"golang.org/x/crypto/ripemd160"
 )
 
 const addressChecksumLen = 4
 
 type Wallet struct {
-	PrivateKey ecdsa.PrivateKey
-	PublicKey  []byte
+	PrivateKey ecdsa.PrivateKey `json:"privateKey"`
+	PublicKey  []byte           `json:"publicKey"`
 }
 
 func NewWallet() *Wallet {
@@ -43,4 +44,15 @@ func checksum(payload []byte) []byte {
 	firstSHA := sha256.Sum256(payload)
 	secondSHA := sha256.Sum256(firstSHA[:])
 	return secondSHA[:addressChecksumLen]
+}
+
+func (w *Wallet) Serialize() []byte {
+	str, _ := json.Marshal(w)
+	return str
+}
+
+func DeserializeWallet(js []byte) *Wallet {
+	var w Wallet
+	json.Unmarshal(js, &w)
+	return &w
 }

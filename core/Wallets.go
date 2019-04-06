@@ -33,7 +33,12 @@ func (ws *Wallets) CreateWallet() string {
 	address := w.GetAddress()
 	ws.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(walletbucket))
-		b.Put(address, w.Serialize())
+		if b == nil {
+			b, _ := tx.CreateBucket([]byte(walletbucket))
+			b.Put(address, w.Serialize())
+		} else {
+			b.Put(address, w.Serialize())
+		}
 		return nil
 	})
 	return string(address)

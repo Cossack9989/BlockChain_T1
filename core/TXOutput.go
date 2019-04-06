@@ -21,7 +21,7 @@ func NewTXOutput(value int, address string) TXOutput {
 
 func (out *TXOutput) Lock(address []byte) {
 	pubkeyhash := Base58Decode(address)
-	pubkeyhash = pubkeyhash[1 : len(pubkeyhash)-4]
+	pubkeyhash = pubkeyhash[0 : len(pubkeyhash)-4]
 	out.PubKeyHash = pubkeyhash
 }
 

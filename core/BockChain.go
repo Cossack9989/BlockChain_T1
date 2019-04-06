@@ -83,7 +83,7 @@ func (bc *BlockChain) FindUnspentTransactions(pubKeyHash []byte) []*Transaction 
 			}
 			if tx.IsCoinBase() == false {
 				for _, in := range tx.Vin {
-					if in.UseKey(pubKeyHash) {
+					if in.CanUnlockWithPubkey(pubKeyHash) {
 						inTxId := string(in.Txid)
 						spentTXOs[inTxId] = append(spentTXOs[inTxId], in.Vout)
 					}
@@ -112,7 +112,7 @@ func (bc *BlockChain) FindUnspentTransactionsOuts(pubKeyHash []byte) []TXOutput 
 
 func (bc *BlockChain) FindSpendableOutputs(from string, amount int) (int, map[string][]int) {
 	pubkeyhash := Base58Decode([]byte(from))
-	pubkeyhash = pubkeyhash[1 : len(pubkeyhash)-4]
+	pubkeyhash = pubkeyhash[0 : len(pubkeyhash)-4]
 	unspentTXs := bc.FindUnspentTransactions(pubkeyhash)
 	unspentTXOuts := make(map[string][]int)
 	accumulated := 0

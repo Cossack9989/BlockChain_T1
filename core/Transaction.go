@@ -1,6 +1,7 @@
 package core
 
 import (
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -68,4 +69,21 @@ func (bc *BlockChain) NewTransaction(from string, to string, amount int) *Transa
 	tx := &Transaction{nil, inputs, outputs}
 	tx.ID = tx.GetHash()
 	return tx
+}
+
+func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transaction) {
+
+}
+
+func (tx *Transaction) TrimmedCopy() Transaction {
+	var inputs []TXInput
+	var outputs []TXOutput
+	for _, vin := range tx.Vin {
+		inputs = append(inputs, TXInput{vin.Txid, vin.Vout, nil, nil})
+	}
+	for _, vout := range tx.Vout {
+		outputs = append(outputs, TXOutput{vout.Value, vout.PubKeyHash})
+	}
+	txCopy := Transaction{tx.ID, inputs, outputs}
+	return txCopy
 }

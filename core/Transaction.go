@@ -2,12 +2,15 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"math/big"
 )
 
-const subsidy = 1
+const subsidy = 50
 
 type Transaction struct {
 	ID   []byte     `json:"id"`
@@ -68,11 +71,25 @@ func (bc *BlockChain) NewTransaction(from string, to string, amount int) *Transa
 	}
 	tx := &Transaction{nil, inputs, outputs}
 	tx.ID = tx.GetHash()
+	bc.SignTransaction(tx, w.PrivateKey)
 	return tx
 }
 
-func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transaction) {
-
+func (tx *Transaction) Sign(privateKey ecdsa.PrivateKey, previousTXs map[string]Transaction) {
+	if tx.IsCoinBase() {
+		return
+	}
+	txCopy := tx.TrimmedCopy()
+	for inID, vin := range txCopy.Vin {
+		prevTx := previousTXs[string(vin.Txid)]
+		txCopy.Vin[inID].Signature = nil
+		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
+		txCopy.ID = txCopy.GetHash()
+		txCopy.Vin[inID].PubKey = nil
+		r, s, _ := ecdsa.Sign(rand.Reader, &privateKey, txCopy.ID)
+		signature := append(r.Bytes(), s.Bytes()...)
+		tx.Vin[inID].Signature = signature
+	}
 }
 
 func (tx *Transaction) TrimmedCopy() Transaction {
@@ -86,4 +103,32 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 	}
 	txCopy := Transaction{tx.ID, inputs, outputs}
 	return txCopy
+}
+
+func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
+	txCopy := tx.TrimmedCopy()
+	curve := elliptic.P256()
+
+	for inID, vin := range tx.Vin {
+		prevTx := prevTXs[string(vin.Txid)]
+		txCopy.Vin[inID].Signature = nil
+		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
+		txCopy.ID = txCopy.GetHash()
+		txCopy.Vin[inID].PubKey = nil
+		r := big.Int{}
+		s := big.Int{}
+		sigLen := len(vin.Signature)
+		r.SetBytes(vin.Signature[:(sigLen / 2)])
+		s.SetBytes(vin.Signature[(sigLen / 2):])
+		x := big.Int{}
+		y := big.Int{}
+		keyLen := len(vin.PubKey)
+		x.SetBytes(vin.PubKey[:(keyLen / 2)])
+		y.SetBytes(vin.PubKey[(keyLen / 2):])
+		rawPubKey := ecdsa.PublicKey{curve, &x, &y}
+		if ecdsa.Verify(&rawPubKey, txCopy.ID, &r, &s) == false {
+			return false
+		}
+	}
+	return true
 }

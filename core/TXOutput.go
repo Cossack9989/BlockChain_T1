@@ -9,10 +9,6 @@ type TXOutput struct {
 	PubKeyHash []byte `json:"pubKeyHash"`
 }
 
-// func (out TXOutput) CanBeUnlockedWith(unlockingData string) bool {
-// 	return out.PubKeyHash == unlockingData
-// }
-
 func NewTXOutput(value int, address string) TXOutput {
 	txo := &TXOutput{value, nil}
 	txo.Lock([]byte(address))

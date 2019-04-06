@@ -1,6 +1,9 @@
 package core
 
 import (
+	"bytes"
+	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"github.com/boltdb/bolt"
 )
@@ -130,4 +133,33 @@ find:
 		}
 	}
 	return accumulated, unspentTXOuts
+}
+
+func (bc *BlockChain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKey) {
+	previousTXs := make(map[string]Transaction)
+	for _, vin := range tx.Vin {
+		previousTX, err := bc.FindTransaction(vin.Txid)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			previousTXs[string(previousTX.ID)] = previousTX
+		}
+	}
+	tx.Sign(privateKey, previousTXs)
+}
+
+func (bc *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
+	bci := bc.GetIterator()
+	for {
+		b := bci.Next()
+		for _, tx := range b.Transactions {
+			if bytes.Compare(tx.ID, ID) == 0 {
+				return *tx, nil
+			}
+		}
+		if len(b.PrevBlockHash) == 0 {
+			break
+		}
+	}
+	return Transaction{}, errors.New("Transaction is not found")
 }
